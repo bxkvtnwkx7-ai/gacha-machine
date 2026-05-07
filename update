@@ -1,5 +1,5 @@
 --------------------------------------------------
--- MYSTERY CAPSULE MACHINE (INTEGRATOR ONLY)
+-- MYSTERY CAPSULE MACHINE (FINAL FIXED)
 -- Tekkit 2 / CC:Tweaked 1.12.2
 --------------------------------------------------
 
@@ -49,7 +49,7 @@ if not ri then
 end
 
 --------------------------------------------------
--- MONITOR
+-- MONITOR UI
 --------------------------------------------------
 local function drawMonitor()
 
@@ -137,7 +137,7 @@ local function canUse()
 end
 
 --------------------------------------------------
--- LOOT SYSTEM
+-- LOOT
 --------------------------------------------------
 local function getLootSlots()
 
@@ -154,19 +154,18 @@ local function getLootSlots()
 end
 
 --------------------------------------------------
--- FIRE CAPSULE (REDSTONE ONLY)
+-- FIRE SYSTEM (FIXED)
 --------------------------------------------------
 local function fireCapsule()
 
-    -- pulse ONLY integrator
-    ri.setOutput("right", true)
+    ri.setOutput(true)
     sleep(0.1)
-    ri.setOutput("right", false)
+    ri.setOutput(false)
 
 end
 
 --------------------------------------------------
--- DISPENSE LOOP
+-- DISPENSE
 --------------------------------------------------
 local function dispense(count)
 
@@ -190,7 +189,7 @@ local function dispense(count)
 end
 
 --------------------------------------------------
--- INPUT PROCESSING (NBT HASH)
+-- INPUT CHECK (NBT HASH)
 --------------------------------------------------
 local function processInput()
 
@@ -221,7 +220,7 @@ end
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-print("Capsule Machine ONLINE (INTEGRATOR ONLY MODE)")
+print("Capsule Machine ONLINE (FINAL FIXED MODE)")
 
 while true do
 
