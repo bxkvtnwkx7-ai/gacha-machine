@@ -1,5 +1,5 @@
 --------------------------------------------------
--- MYSTERY CAPSULE MACHINE (BULLETPROOF EDITION)
+-- MYSTERY CAPSULE MACHINE (FINAL STABLE BUILD)
 -- CC:Tweaked 1.12.2 / Tekkit 2
 --------------------------------------------------
 
@@ -41,49 +41,47 @@ if not mon then error("Missing monitor") end
 local trashName = peripheral.getName(trash)
 
 --------------------------------------------------
--- AUTO FIND DROPPER (ROBUST)
+-- DROPPER RESOLUTION (YOUR EXACT SETUP)
 --------------------------------------------------
 local dropperName = nil
-local dropper = nil
 
-local function findDropper()
+-- Priority 1: exact known ID
+if peripheral.isPresent("minecraft:dropper_6") then
+    dropperName = "minecraft:dropper_6"
+end
+
+-- Priority 2: scan exact match
+if not dropperName then
     for _, name in ipairs(peripheral.getNames()) do
-        local ptype = peripheral.getType(name)
-
-        if ptype == "dropper" or ptype == "minecraft:dropper" then
-            return name
+        if name == "minecraft:dropper_6" then
+            dropperName = name
+            break
         end
     end
-    return nil
 end
 
-dropperName = findDropper()
+-- Priority 3: fallback scan (modpack safety)
+if not dropperName then
+    for _, name in ipairs(peripheral.getNames()) do
+        local t = peripheral.getType(name)
+        if t == "dropper" or t == "minecraft:dropper" then
+            dropperName = name
+            break
+        end
+    end
+end
 
 if not dropperName then
-    error("No dropper found anywhere on network")
+    error("Dropper not found (expected minecraft:dropper_6)")
 end
 
-dropper = peripheral.wrap(dropperName)
+local dropper = peripheral.wrap(dropperName)
 
---------------------------------------------------
--- SAFE DROP TEST
---------------------------------------------------
-local function testDropper()
-    if not dropper then return false end
-
-    local test = dropper.list()
-    if test == nil then
-        return false
-    end
-
-    return true
+if not dropper then
+    error("Failed to wrap dropper: " .. tostring(dropperName))
 end
 
-if not testDropper() then
-    error("Dropper found but not usable: " .. tostring(dropperName))
-end
-
-print("Dropper online:", dropperName)
+print("Dropper locked:", dropperName)
 
 --------------------------------------------------
 -- MONITOR
@@ -170,7 +168,7 @@ local function dispense(count)
 end
 
 --------------------------------------------------
--- INPUT PROCESSING (NBT HASH FIXED)
+-- INPUT PROCESSING (NBT HASH CHECK)
 --------------------------------------------------
 local function processInput()
 
@@ -201,8 +199,8 @@ end
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-print("Capsule Machine ONLINE (BULLETPROOF MODE)")
-print("Using dropper:", dropperName)
+print("Capsule Machine ONLINE (FINAL BUILD)")
+print("Dropper:", dropperName)
 
 while true do
 
