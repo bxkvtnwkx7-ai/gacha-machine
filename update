@@ -1,6 +1,6 @@
 --------------------------------------------------
--- MYSTERY CAPSULE MACHINE (FINAL STABLE BUILD)
--- CC:Tweaked 1.12.2 / Tekkit 2
+-- MYSTERY CAPSULE MACHINE (INTEGRATOR ONLY)
+-- Tekkit 2 / CC:Tweaked 1.12.2
 --------------------------------------------------
 
 math.randomseed(os.time())
@@ -21,7 +21,7 @@ local WINDOW_SECONDS = 3600
 
 local uses = 0
 local windowStart = os.clock()
-local lastStatus = "Booting..."
+local lastStatus = "Idle"
 
 --------------------------------------------------
 -- PERIPHERALS
@@ -41,47 +41,12 @@ if not mon then error("Missing monitor") end
 local trashName = peripheral.getName(trash)
 
 --------------------------------------------------
--- DROPPER RESOLUTION (YOUR EXACT SETUP)
+-- REDSTONE INTEGRATOR (ONLY ACTUATOR)
 --------------------------------------------------
-local dropperName = nil
-
--- Priority 1: exact known ID
-if peripheral.isPresent("minecraft:dropper_6") then
-    dropperName = "minecraft:dropper_6"
+local ri = peripheral.wrap("redstone_integrator_4067")
+if not ri then
+    error("Missing redstone_integrator_4067")
 end
-
--- Priority 2: scan exact match
-if not dropperName then
-    for _, name in ipairs(peripheral.getNames()) do
-        if name == "minecraft:dropper_6" then
-            dropperName = name
-            break
-        end
-    end
-end
-
--- Priority 3: fallback scan (modpack safety)
-if not dropperName then
-    for _, name in ipairs(peripheral.getNames()) do
-        local t = peripheral.getType(name)
-        if t == "dropper" or t == "minecraft:dropper" then
-            dropperName = name
-            break
-        end
-    end
-end
-
-if not dropperName then
-    error("Dropper not found (expected minecraft:dropper_6)")
-end
-
-local dropper = peripheral.wrap(dropperName)
-
-if not dropper then
-    error("Failed to wrap dropper: " .. tostring(dropperName))
-end
-
-print("Dropper locked:", dropperName)
 
 --------------------------------------------------
 -- MONITOR
@@ -98,19 +63,62 @@ local function drawMonitor()
     mon.write("MYSTERY CAPSULE MACHINE")
 
     mon.setCursorPos(2,4)
-    mon.write("Dropper: OK")
-
-    mon.setCursorPos(2,5)
     mon.write("Uses: "..uses.."/"..MAX_USES_PER_HOUR)
 
-    mon.setCursorPos(2,6)
+    mon.setCursorPos(2,5)
     mon.write("Remaining: "..remaining)
 
-    mon.setCursorPos(2,7)
+    mon.setCursorPos(2,6)
     mon.write("Cooldown: "..math.floor(cooldown).."s")
 
+    mon.setCursorPos(2,8)
+    mon.write("Status:")
+
     mon.setCursorPos(2,9)
-    mon.write("Status: "..lastStatus)
+    mon.write(lastStatus)
+end
+
+--------------------------------------------------
+-- SPIN ANIMATION
+--------------------------------------------------
+local function capsuleSpinAnimation()
+
+    local frames = {
+        "[   ]",
+        "[=  ]",
+        "[== ]",
+        "[===]",
+        "[ ==]",
+        "[  =]"
+    }
+
+    mon.clear()
+
+    for i = 1, 2 do
+        for _, f in ipairs(frames) do
+
+            mon.clear()
+
+            mon.setCursorPos(2,2)
+            mon.write("MYSTERY CAPSULE MACHINE")
+
+            mon.setCursorPos(2,4)
+            mon.write("Spinning Capsule...")
+
+            mon.setCursorPos(2,6)
+            mon.write(f)
+
+            mon.setCursorPos(2,8)
+            mon.write("Please wait...")
+
+            sleep(0.1)
+        end
+    end
+
+    mon.clear()
+    mon.setCursorPos(2,4)
+    mon.write("Releasing capsule...")
+    sleep(0.4)
 end
 
 --------------------------------------------------
@@ -145,6 +153,21 @@ local function getLootSlots()
     return slots
 end
 
+--------------------------------------------------
+-- FIRE CAPSULE (REDSTONE ONLY)
+--------------------------------------------------
+local function fireCapsule()
+
+    -- pulse ONLY integrator
+    ri.setOutput("right", true)
+    sleep(0.1)
+    ri.setOutput("right", false)
+
+end
+
+--------------------------------------------------
+-- DISPENSE LOOP
+--------------------------------------------------
 local function dispense(count)
 
     local slots = getLootSlots()
@@ -158,17 +181,16 @@ local function dispense(count)
 
         local slot = slots[math.random(1, #slots)]
 
-        local moved = loot.pushItems(dropperName, slot, 1)
+        loot.pushItems(HOPPER_NAME, slot, 1)
 
-        if moved > 0 then
-            dropper.trigger()
-            sleep(0.15)
-        end
+        fireCapsule()
+
+        sleep(0.15)
     end
 end
 
 --------------------------------------------------
--- INPUT PROCESSING (NBT HASH CHECK)
+-- INPUT PROCESSING (NBT HASH)
 --------------------------------------------------
 local function processInput()
 
@@ -199,8 +221,7 @@ end
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-print("Capsule Machine ONLINE (FINAL BUILD)")
-print("Dropper:", dropperName)
+print("Capsule Machine ONLINE (INTEGRATOR ONLY MODE)")
 
 while true do
 
@@ -216,6 +237,8 @@ while true do
             uses = uses + 1
 
             input.pushItems(trashName, slot, 1)
+
+            capsuleSpinAnimation()
 
             dispense(2)
 
