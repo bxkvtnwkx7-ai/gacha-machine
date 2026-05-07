@@ -14,20 +14,13 @@ local LOOT_NAME    = "minecraft:ironchest_obsidian_206"
 local TRASH_NAME   = "minecraft:ironchest_obsidian_207"
 local MONITOR_NAME = "monitor_970"
 
---------------------------------------------------
--- VALID BOOK HASH
---------------------------------------------------
 local VALID_BOOK_HASH = "01cf97"
 
---------------------------------------------------
--- RATE LIMIT
---------------------------------------------------
 local MAX_USES_PER_HOUR = 10
 local WINDOW_SECONDS = 3600
 
 local uses = 0
 local windowStart = os.clock()
-
 local lastStatus = "Idle"
 
 --------------------------------------------------
@@ -48,19 +41,19 @@ if not mon then error("Missing monitor") end
 local trashName = peripheral.getName(trash)
 
 --------------------------------------------------
--- DROPPER (LEFT SIDE FIX)
+-- DROPPER (LEFT SIDE - FIXED SAFE VERSION)
 --------------------------------------------------
 local DISP_SIDE = "left"
 
 if not peripheral.isPresent(DISP_SIDE) then
-    error("No peripheral found on LEFT side")
-end
-
-if peripheral.getType(DISP_SIDE) ~= "dropper" then
-    error("Peripheral on LEFT is not a dropper (found: "..tostring(peripheral.getType(DISP_SIDE))..")")
+    error("No peripheral on LEFT side")
 end
 
 local dropper = peripheral.wrap(DISP_SIDE)
+
+if not dropper then
+    error("Failed to wrap dropper on left side")
+end
 
 --------------------------------------------------
 -- MONITOR
@@ -143,7 +136,7 @@ local function dispense(count)
 end
 
 --------------------------------------------------
--- INPUT PROCESSING (NBT FIXED)
+-- INPUT PROCESSING (NBT HASH FIXED)
 --------------------------------------------------
 local function processInput()
 
@@ -174,7 +167,7 @@ end
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-print("Capsule Machine ONLINE (LEFT DROPPER FIX)")
+print("Capsule Machine ONLINE (FIXED DROPPER)")
 
 while true do
 
