@@ -1,5 +1,5 @@
 --------------------------------------------------
--- MYSTERY CAPSULE MACHINE (DISPENSER + RATE LIMIT)
+-- MYSTERY CAPSULE MACHINE (DISPENSER + MONITOR + RATE LIMIT)
 -- CC:Tweaked 1.12.2 / Tekkit 2
 --------------------------------------------------
 
@@ -11,17 +11,16 @@ math.randomseed(os.time())
 local INPUT_CHEST_NAME = "minecraft:chest_0"
 local LOOT_CHEST_NAME  = "minecraft:chest_1"
 local DISPENSER_NAME   = "minecraft:dispenser_0"
+local MONITOR_NAME     = "monitor_970"
 
--- ONLY valid capsule key
 local VALID_BOOK_HASH = "01cf97"
 
--- Reward scaling (optional tiers)
 local TIER_BONUS = {
   ["01cf97"] = 2
 }
 
 --------------------------------------------------
--- RATE LIMIT (10 uses per hour)
+-- RATE LIMIT
 --------------------------------------------------
 local MAX_USES_PER_HOUR = 10
 local WINDOW_SECONDS = 3600
@@ -29,20 +28,53 @@ local WINDOW_SECONDS = 3600
 local uses = 0
 local windowStart = os.clock()
 
+local lastStatus = "Idle"
+
 --------------------------------------------------
 -- PERIPHERALS
 --------------------------------------------------
 local input = peripheral.wrap(INPUT_CHEST_NAME)
 local loot  = peripheral.wrap(LOOT_CHEST_NAME)
 local disp  = peripheral.wrap(DISPENSER_NAME)
+local mon   = peripheral.wrap(MONITOR_NAME)
 
-if not input or not loot or not disp then
-  error("Missing peripherals: input chest, loot chest, or dispenser")
+if not input or not loot or not disp or not mon then
+  error("Missing peripherals (input, loot, dispenser, or monitor)")
 end
 
 local dispName = peripheral.getName(disp)
-local lootName = peripheral.getName(loot)
-local inputName = peripheral.getName(input)
+
+--------------------------------------------------
+-- MONITOR UI
+--------------------------------------------------
+local function draw()
+  mon.setTextScale(0.5)
+  mon.clear()
+
+  local w, h = mon.getSize()
+
+  local remaining = MAX_USES_PER_HOUR - uses
+  local now = os.clock()
+  local cooldown = math.max(0, WINDOW_SECONDS - (now - windowStart))
+
+  mon.setCursorPos(2, 2)
+  mon.write("MYSTERY CAPSULE MACHINE")
+
+  mon.setCursorPos(2, 4)
+  mon.write("Uses: " .. uses .. "/" .. MAX_USES_PER_HOUR)
+
+  mon.setCursorPos(2, 5)
+  mon.write("Remaining: " .. remaining)
+
+  mon.setCursorPos(2, 6)
+  mon.write("Cooldown: " .. math.floor(cooldown) .. "s")
+
+  mon.setCursorPos(2, 8)
+  mon.write("Status:")
+
+  mon.setCursorPos(2, 9)
+  mon.write(lastStatus)
+end
 
 --------------------------------------------------
 -- HELPERS
@@ -65,7 +97,6 @@ end
 local function canUseMachine()
   local now = os.clock()
 
-  -- reset hourly window
   if now - windowStart >= WINDOW_SECONDS then
     uses = 0
     windowStart = now
@@ -105,21 +136,20 @@ local function getLootSlots()
 end
 
 --------------------------------------------------
--- DISPENSE LOGIC
+-- DISPENSE
 --------------------------------------------------
 
-local function dispenseRandomItems(count)
+local function dispense(count)
   local slots = getLootSlots()
-  if #slots == 0 then return end
+  if #slots == 0 then
+    lastStatus = "No loot available"
+    return
+  end
 
   for i = 1, count do
-    local lootSlot = slots[math.random(1, #slots)]
+    local slot = slots[math.random(1, #slots)]
 
-    local moved = loot.pushItems(
-      dispName,
-      lootSlot,
-      1
-    )
+    local moved = loot.pushItems(dispName, slot, 1)
 
     if moved > 0 then
       disp.trigger()
@@ -136,7 +166,7 @@ end
 -- MAIN LOOP
 --------------------------------------------------
 
-print("Mystery Capsule Machine ONLINE (10 uses/hour limit)")
+print("Capsule Machine ONLINE")
 
 while true do
 
@@ -144,28 +174,24 @@ while true do
 
   if slot then
 
-    -- RATE LIMIT CHECK
     if not canUseMachine() then
-      print("Cooldown active: 10 uses/hour reached")
-      sleep(2)
+      lastStatus = "COOLDOWN ACTIVE"
     else
-      print("Valid capsule detected: " .. hash)
+      lastStatus = "CAPSULE ACCEPTED"
 
-      -- consume key
       consumeBook(slot)
 
-      -- register usage
       uses = uses + 1
 
-      -- determine reward
-      local rewardCount = TIER_BONUS[hash] or 1
+      local reward = TIER_BONUS[hash] or 1
+      dispense(reward)
 
-      -- dispense loot
-      dispenseRandomItems(rewardCount)
-
-      print("Used " .. uses .. "/" .. MAX_USES_PER_HOUR)
+      lastStatus = "Dispensed " .. reward .. " item(s)"
     end
+  else
+    lastStatus = "Idle"
   end
 
+  draw()
   sleep(1)
 end
