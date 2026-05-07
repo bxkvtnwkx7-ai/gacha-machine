@@ -1,6 +1,6 @@
 --------------------------------------------------
--- MYSTERY CAPSULE MACHINE (FINAL FIXED)
--- Tekkit 2 / CC:Tweaked 1.12.2
+-- MYSTERY CAPSULE MACHINE (REFINED v2)
+-- CC:Tweaked 1.12.2
 --------------------------------------------------
 
 math.randomseed(os.time())
@@ -8,11 +8,12 @@ math.randomseed(os.time())
 --------------------------------------------------
 -- CONFIG
 --------------------------------------------------
-local INPUT_NAME   = "minecraft:ironchest_obsidian_208"
-local HOPPER_NAME  = "minecraft:hopper_57"
-local LOOT_NAME    = "minecraft:ironchest_obsidian_206"
-local TRASH_NAME   = "minecraft:ironchest_obsidian_207"
-local MONITOR_NAME = "monitor_970"
+local INPUT_NAME  = "minecraft:ironchest_obsidian_209"
+local BOOK_NAME   = "minecraft:ironchest_obsidian_210"
+local TRASH_NAME  = "minecraft:ironchest_obsidian_211"
+local LOOT_NAME   = "minecraft:ironchest_obsidian_212"
+local OUTPUT_NAME = "minecraft:ironchest_obsidian_213"
+local MONITOR_NAME = "monitor_971"
 
 local VALID_BOOK_HASH = "01cf97"
 
@@ -26,27 +27,23 @@ local lastStatus = "Idle"
 --------------------------------------------------
 -- PERIPHERALS
 --------------------------------------------------
-local input = peripheral.wrap(INPUT_NAME)
-local hopper = peripheral.wrap(HOPPER_NAME)
-local loot   = peripheral.wrap(LOOT_NAME)
+local input  = peripheral.wrap(INPUT_NAME)
+local books  = peripheral.wrap(BOOK_NAME)
 local trash  = peripheral.wrap(TRASH_NAME)
+local loot   = peripheral.wrap(LOOT_NAME)
+local output = peripheral.wrap(OUTPUT_NAME)
 local mon    = peripheral.wrap(MONITOR_NAME)
 
 if not input then error("Missing input chest") end
-if not hopper then error("Missing hopper") end
-if not loot then error("Missing loot chest") end
+if not books then error("Missing book chest") end
 if not trash then error("Missing trash chest") end
+if not loot then error("Missing loot chest") end
+if not output then error("Missing output chest") end
 if not mon then error("Missing monitor") end
 
 local trashName = peripheral.getName(trash)
-
---------------------------------------------------
--- REDSTONE INTEGRATOR
---------------------------------------------------
-local ri = peripheral.wrap("redstone_integrator_4067")
-if not ri then
-    error("Missing redstone_integrator_4067")
-end
+local lootName = peripheral.getName(loot)
+local outputName = peripheral.getName(output)
 
 --------------------------------------------------
 -- MONITOR UI
@@ -81,7 +78,7 @@ end
 --------------------------------------------------
 -- SPIN ANIMATION
 --------------------------------------------------
-local function capsuleSpinAnimation()
+local function spin()
 
     local frames = {
         "[   ]",
@@ -92,9 +89,7 @@ local function capsuleSpinAnimation()
         "[  =]"
     }
 
-    mon.clear()
-
-    for i = 1, 2 do
+    for _ = 1, 2 do
         for _, f in ipairs(frames) do
 
             mon.clear()
@@ -103,22 +98,17 @@ local function capsuleSpinAnimation()
             mon.write("MYSTERY CAPSULE MACHINE")
 
             mon.setCursorPos(2,4)
-            mon.write("Spinning Capsule...")
+            mon.write("Spinning...")
 
             mon.setCursorPos(2,6)
             mon.write(f)
 
             mon.setCursorPos(2,8)
-            mon.write("Please wait...")
+            mon.write("Resolving reward")
 
-            sleep(0.1)
+            sleep(0.08)
         end
     end
-
-    mon.clear()
-    mon.setCursorPos(2,4)
-    mon.write("Releasing capsule...")
-    sleep(0.4)
 end
 
 --------------------------------------------------
@@ -137,60 +127,7 @@ local function canUse()
 end
 
 --------------------------------------------------
--- LOOT
---------------------------------------------------
-local function getLootSlots()
-
-    local items = loot.list()
-    local slots = {}
-
-    for slot, item in pairs(items) do
-        if item then
-            table.insert(slots, slot)
-        end
-    end
-
-    return slots
-end
-
---------------------------------------------------
--- FIRE CAPSULE (FIXED)
---------------------------------------------------
-local function fireCapsule()
-
-    -- CORRECT integrator usage (string channel + boolean)
-    ri.setOutput("output", true)
-    sleep(0.1)
-    ri.setOutput("output", false)
-
-end
-
---------------------------------------------------
--- DISPENSE ITEMS
---------------------------------------------------
-local function dispense(count)
-
-    local slots = getLootSlots()
-
-    if #slots == 0 then
-        lastStatus = "Loot empty"
-        return
-    end
-
-    for i = 1, count do
-
-        local slot = slots[math.random(1, #slots)]
-
-        loot.pushItems(HOPPER_NAME, slot, 1)
-
-        fireCapsule()
-
-        sleep(0.15)
-    end
-end
-
---------------------------------------------------
--- INPUT CHECK (NBT HASH)
+-- INPUT VALIDATION
 --------------------------------------------------
 local function processInput()
 
@@ -210,7 +147,7 @@ local function processInput()
             end
 
             input.pushItems(trashName, slot, 64)
-            lastStatus = "Invalid item → trashed"
+            lastStatus = "Invalid item → trash"
             return nil, false
         end
     end
@@ -219,9 +156,51 @@ local function processInput()
 end
 
 --------------------------------------------------
+-- LOOT PICK
+--------------------------------------------------
+local function getLootSlots()
+
+    local items = loot.list()
+    local slots = {}
+
+    for slot, item in pairs(items) do
+        if item then
+            table.insert(slots, slot)
+        end
+    end
+
+    return slots
+end
+
+local function pickLootSlot()
+
+    local slots = getLootSlots()
+
+    if #slots == 0 then return nil end
+
+    return slots[math.random(1, #slots)]
+end
+
+--------------------------------------------------
+-- DISPENSE TO OUTPUT (NEW CORE LOGIC)
+--------------------------------------------------
+local function dispense()
+
+    local slot = pickLootSlot()
+
+    if not slot then
+        lastStatus = "Loot empty"
+        return
+    end
+
+    -- move 1 item directly to output chest
+    loot.pushItems(outputName, slot, 1)
+end
+
+--------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-print("Capsule Machine ONLINE (FINAL FIXED)")
+print("MYSTERY CAPSULE MACHINE ONLINE (REFINED)")
 
 while true do
 
@@ -232,17 +211,17 @@ while true do
         if not canUse() then
             lastStatus = "LIMIT REACHED (10/hr)"
         else
-            lastStatus = "Capsule Accepted"
-
             uses = uses + 1
 
             input.pushItems(trashName, slot, 1)
 
-            capsuleSpinAnimation()
+            lastStatus = "Accepted"
 
-            dispense(2)
+            spin()
 
-            lastStatus = "Dispensed 2 items"
+            dispense()
+
+            lastStatus = "Reward delivered"
         end
     end
 
