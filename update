@@ -1,29 +1,23 @@
 --------------------------------------------------
 -- MYSTERY CAPSULE MACHINE
--- Tekkit 2 / CC:Tweaked 1.12.2
+-- CC:Tweaked 1.12.2 / Tekkit 2
 --------------------------------------------------
 
 math.randomseed(os.time())
 
 --------------------------------------------------
--- PERIPHERALS
+-- CONFIG
 --------------------------------------------------
 local INPUT_NAME   = "minecraft:ironchest_obsidian_208"
 local HOPPER_NAME  = "minecraft:hopper_57"
 local LOOT_NAME    = "minecraft:ironchest_obsidian_206"
 local TRASH_NAME   = "minecraft:ironchest_obsidian_207"
-local DISP_NAME    = "minecraft:dispenser_0" -- CHANGE IF NEEDED
 local MONITOR_NAME = "monitor_970"
 
 --------------------------------------------------
--- VALID CAPSULE HASH
+-- VALID BOOK HASH
 --------------------------------------------------
 local VALID_BOOK_HASH = "01cf97"
-
---------------------------------------------------
--- REWARDS
---------------------------------------------------
-local REWARD_COUNT = 2
 
 --------------------------------------------------
 -- RATE LIMIT
@@ -34,46 +28,58 @@ local WINDOW_SECONDS = 3600
 local uses = 0
 local windowStart = os.clock()
 
---------------------------------------------------
--- STATUS
---------------------------------------------------
 local lastStatus = "Idle"
 
 --------------------------------------------------
--- WRAP PERIPHERALS
+-- PERIPHERALS (STATIC)
 --------------------------------------------------
 local input = peripheral.wrap(INPUT_NAME)
 local hopper = peripheral.wrap(HOPPER_NAME)
-local loot = peripheral.wrap(LOOT_NAME)
-local trash = peripheral.wrap(TRASH_NAME)
-local disp = peripheral.wrap(DISP_NAME)
-local mon = peripheral.wrap(MONITOR_NAME)
+local loot   = peripheral.wrap(LOOT_NAME)
+local trash  = peripheral.wrap(TRASH_NAME)
+local mon    = peripheral.wrap(MONITOR_NAME)
 
 if not input then error("Missing input chest") end
 if not hopper then error("Missing hopper") end
 if not loot then error("Missing loot chest") end
 if not trash then error("Missing trash chest") end
-if not disp then error("Missing dispenser") end
 if not mon then error("Missing monitor") end
 
 local trashName = peripheral.getName(trash)
-local dispName = peripheral.getName(disp)
 
 --------------------------------------------------
--- MONITOR UI
+-- AUTO-DETECT DROPPER
+--------------------------------------------------
+local function findDropper()
+    local names = peripheral.getNames()
+
+    for _, name in ipairs(names) do
+        if peripheral.getType(name) == "dropper" then
+            return name
+        end
+    end
+
+    return nil
+end
+
+local DISP_NAME = findDropper()
+
+if not DISP_NAME then
+    error("No dropper found attached to computer")
+end
+
+local dropper = peripheral.wrap(DISP_NAME)
+
+--------------------------------------------------
+-- MONITOR
 --------------------------------------------------
 local function drawMonitor()
 
-    mon.setBackgroundColor(colors.black)
-    mon.setTextColor(colors.white)
     mon.setTextScale(0.5)
-
     mon.clear()
 
     local remaining = MAX_USES_PER_HOUR - uses
-
-    local elapsed = os.clock() - windowStart
-    local cooldown = math.max(0, WINDOW_SECONDS - elapsed)
+    local cooldown = math.max(0, WINDOW_SECONDS - (os.clock() - windowStart))
 
     mon.setCursorPos(2,2)
     mon.write("MYSTERY CAPSULE MACHINE")
@@ -85,7 +91,7 @@ local function drawMonitor()
     mon.write("Remaining: "..remaining)
 
     mon.setCursorPos(2,6)
-    mon.write("Reset In: "..math.floor(cooldown).."s")
+    mon.write("Cooldown: "..math.floor(cooldown).."s")
 
     mon.setCursorPos(2,8)
     mon.write("Status:")
@@ -95,10 +101,9 @@ local function drawMonitor()
 end
 
 --------------------------------------------------
--- RATE LIMIT CHECK
+-- RATE LIMIT
 --------------------------------------------------
 local function canUse()
-
     local now = os.clock()
 
     if now - windowStart >= WINDOW_SECONDS then
@@ -110,10 +115,9 @@ local function canUse()
 end
 
 --------------------------------------------------
--- RANDOM LOOT SLOTS
+-- LOOT SYSTEM
 --------------------------------------------------
 local function getLootSlots()
-
     local items = loot.list()
     local slots = {}
 
@@ -126,37 +130,27 @@ local function getLootSlots()
     return slots
 end
 
---------------------------------------------------
--- DISPENSE RANDOM ITEMS
---------------------------------------------------
-local function dispenseLoot(count)
-
+local function dispense(count)
     local slots = getLootSlots()
-
     if #slots == 0 then
-        lastStatus = "Loot chest empty"
+        lastStatus = "Loot empty"
         return
     end
 
     for i = 1, count do
+        local slot = slots[math.random(1, #slots)]
 
-        local randomSlot = slots[math.random(1, #slots)]
-
-        local moved = loot.pushItems(
-            dispName,
-            randomSlot,
-            1
-        )
+        local moved = loot.pushItems(DISP_NAME, slot, 1)
 
         if moved > 0 then
-            disp.trigger()
+            dropper.trigger()
             sleep(0.15)
         end
     end
 end
 
 --------------------------------------------------
--- PROCESS INPUT ITEMS
+-- INPUT PROCESSING (NBT HASH FIXED)
 --------------------------------------------------
 local function processInput()
 
@@ -166,9 +160,6 @@ local function processInput()
 
         if item then
 
-            --------------------------------------------------
-            -- VALID BOOK CHECK
-            --------------------------------------------------
             if item.name == "minecraft:written_book" and item.nbtHash then
 
                 local hash = string.sub(item.nbtHash, 1, 6)
@@ -178,13 +169,9 @@ local function processInput()
                 end
             end
 
-            --------------------------------------------------
-            -- INVALID ITEM -> TRASH
-            --------------------------------------------------
+            -- anything else → trash
             input.pushItems(trashName, slot, 64)
-
-            lastStatus = "Invalid item trashed"
-
+            lastStatus = "Invalid item → trashed"
             return nil, false
         end
     end
@@ -195,7 +182,9 @@ end
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-print("Mystery Capsule Machine ONLINE")
+print("Capsule Machine ONLINE (AUTO DROPPER MODE)")
+
+print("Using dropper:", DISP_NAME)
 
 while true do
 
@@ -204,30 +193,20 @@ while true do
     if slot and valid then
 
         if not canUse() then
-
-            lastStatus = "LIMIT REACHED"
-
+            lastStatus = "LIMIT REACHED (10/hr)"
         else
-
             lastStatus = "Capsule Accepted"
 
             uses = uses + 1
 
-            --------------------------------------------------
-            -- CONSUME BOOK
-            --------------------------------------------------
             input.pushItems(trashName, slot, 1)
 
-            --------------------------------------------------
-            -- DISPENSE RANDOM LOOT
-            --------------------------------------------------
-            dispenseLoot(REWARD_COUNT)
+            dispense(2)
 
-            lastStatus = "Dispensed "..REWARD_COUNT.." item(s)"
+            lastStatus = "Dispensed 2 items"
         end
     end
 
     drawMonitor()
-
     sleep(0.25)
 end
