@@ -1,0 +1,230 @@
+--------------------------------------------------
+-- MYSTERY CAPSULE MACHINE (REFINED v2)
+-- CC:Tweaked 1.12.2
+--------------------------------------------------
+
+math.randomseed(os.time())
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+local INPUT_NAME  = "minecraft:ironchest_obsidian_209"
+local BOOK_NAME   = "minecraft:ironchest_obsidian_210"
+local TRASH_NAME  = "minecraft:ironchest_obsidian_211"
+local LOOT_NAME   = "minecraft:ironchest_obsidian_212"
+local OUTPUT_NAME = "minecraft:ironchest_obsidian_213"
+local MONITOR_NAME = "monitor_971"
+
+local VALID_BOOK_HASH = "01cf97"
+
+local MAX_USES_PER_HOUR = 10
+local WINDOW_SECONDS = 3600
+
+local uses = 0
+local windowStart = os.clock()
+local lastStatus = "Idle"
+
+--------------------------------------------------
+-- PERIPHERALS
+--------------------------------------------------
+local input  = peripheral.wrap(INPUT_NAME)
+local books  = peripheral.wrap(BOOK_NAME)
+local trash  = peripheral.wrap(TRASH_NAME)
+local loot   = peripheral.wrap(LOOT_NAME)
+local output = peripheral.wrap(OUTPUT_NAME)
+local mon    = peripheral.wrap(MONITOR_NAME)
+
+if not input then error("Missing input chest") end
+if not books then error("Missing book chest") end
+if not trash then error("Missing trash chest") end
+if not loot then error("Missing loot chest") end
+if not output then error("Missing output chest") end
+if not mon then error("Missing monitor") end
+
+local trashName = peripheral.getName(trash)
+local lootName = peripheral.getName(loot)
+local outputName = peripheral.getName(output)
+
+--------------------------------------------------
+-- MONITOR UI
+--------------------------------------------------
+local function drawMonitor()
+
+    mon.setTextScale(0.5)
+    mon.clear()
+
+    local remaining = MAX_USES_PER_HOUR - uses
+    local cooldown = math.max(0, WINDOW_SECONDS - (os.clock() - windowStart))
+
+    mon.setCursorPos(2,2)
+    mon.write("MYSTERY CAPSULE MACHINE")
+
+    mon.setCursorPos(2,4)
+    mon.write("Uses: "..uses.."/"..MAX_USES_PER_HOUR)
+
+    mon.setCursorPos(2,5)
+    mon.write("Remaining: "..remaining)
+
+    mon.setCursorPos(2,6)
+    mon.write("Cooldown: "..math.floor(cooldown).."s")
+
+    mon.setCursorPos(2,8)
+    mon.write("Status:")
+
+    mon.setCursorPos(2,9)
+    mon.write(lastStatus)
+end
+
+--------------------------------------------------
+-- SPIN ANIMATION
+--------------------------------------------------
+local function spin()
+
+    local frames = {
+        "[   ]",
+        "[=  ]",
+        "[== ]",
+        "[===]",
+        "[ ==]",
+        "[  =]"
+    }
+
+    for _ = 1, 2 do
+        for _, f in ipairs(frames) do
+
+            mon.clear()
+
+            mon.setCursorPos(2,2)
+            mon.write("MYSTERY CAPSULE MACHINE")
+
+            mon.setCursorPos(2,4)
+            mon.write("Spinning...")
+
+            mon.setCursorPos(2,6)
+            mon.write(f)
+
+            mon.setCursorPos(2,8)
+            mon.write("Resolving reward")
+
+            sleep(0.08)
+        end
+    end
+end
+
+--------------------------------------------------
+-- RATE LIMIT
+--------------------------------------------------
+local function canUse()
+
+    local now = os.clock()
+
+    if now - windowStart >= WINDOW_SECONDS then
+        uses = 0
+        windowStart = now
+    end
+
+    return uses < MAX_USES_PER_HOUR
+end
+
+--------------------------------------------------
+-- INPUT VALIDATION
+--------------------------------------------------
+local function processInput()
+
+    local items = input.list()
+
+    for slot, item in pairs(items) do
+
+        if item then
+
+            if item.name == "minecraft:written_book" and item.nbtHash then
+
+                local hash = string.sub(item.nbtHash, 1, 6)
+
+                if hash == VALID_BOOK_HASH then
+                    return slot, true
+                end
+            end
+
+            input.pushItems(trashName, slot, 64)
+            lastStatus = "Invalid item → trash"
+            return nil, false
+        end
+    end
+
+    return nil, false
+end
+
+--------------------------------------------------
+-- LOOT PICK
+--------------------------------------------------
+local function getLootSlots()
+
+    local items = loot.list()
+    local slots = {}
+
+    for slot, item in pairs(items) do
+        if item then
+            table.insert(slots, slot)
+        end
+    end
+
+    return slots
+end
+
+local function pickLootSlot()
+
+    local slots = getLootSlots()
+
+    if #slots == 0 then return nil end
+
+    return slots[math.random(1, #slots)]
+end
+
+--------------------------------------------------
+-- DISPENSE TO OUTPUT (NEW CORE LOGIC)
+--------------------------------------------------
+local function dispense()
+
+    local slot = pickLootSlot()
+
+    if not slot then
+        lastStatus = "Loot empty"
+        return
+    end
+
+    -- move 1 item directly to output chest
+    loot.pushItems(outputName, slot, 1)
+end
+
+--------------------------------------------------
+-- MAIN LOOP
+--------------------------------------------------
+print("MYSTERY CAPSULE MACHINE ONLINE (REFINED)")
+
+while true do
+
+    local slot, valid = processInput()
+
+    if slot and valid then
+
+        if not canUse() then
+            lastStatus = "LIMIT REACHED (10/hr)"
+        else
+            uses = uses + 1
+
+            input.pushItems(trashName, slot, 1)
+
+            lastStatus = "Accepted"
+
+            spin()
+
+            dispense()
+
+            lastStatus = "Reward delivered"
+        end
+    end
+
+    drawMonitor()
+    sleep(0.25)
+end
