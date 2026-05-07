@@ -1,0 +1,171 @@
+--------------------------------------------------
+-- MYSTERY CAPSULE MACHINE (DISPENSER + RATE LIMIT)
+-- CC:Tweaked 1.12.2 / Tekkit 2
+--------------------------------------------------
+
+math.randomseed(os.time())
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+local INPUT_CHEST_NAME = "minecraft:chest_0"
+local LOOT_CHEST_NAME  = "minecraft:chest_1"
+local DISPENSER_NAME   = "minecraft:dispenser_0"
+
+-- ONLY valid capsule key
+local VALID_BOOK_HASH = "01cf97"
+
+-- Reward scaling (optional tiers)
+local TIER_BONUS = {
+  ["01cf97"] = 2
+}
+
+--------------------------------------------------
+-- RATE LIMIT (10 uses per hour)
+--------------------------------------------------
+local MAX_USES_PER_HOUR = 10
+local WINDOW_SECONDS = 3600
+
+local uses = 0
+local windowStart = os.clock()
+
+--------------------------------------------------
+-- PERIPHERALS
+--------------------------------------------------
+local input = peripheral.wrap(INPUT_CHEST_NAME)
+local loot  = peripheral.wrap(LOOT_CHEST_NAME)
+local disp  = peripheral.wrap(DISPENSER_NAME)
+
+if not input or not loot or not disp then
+  error("Missing peripherals: input chest, loot chest, or dispenser")
+end
+
+local dispName = peripheral.getName(disp)
+local lootName = peripheral.getName(loot)
+local inputName = peripheral.getName(input)
+
+--------------------------------------------------
+-- HELPERS
+--------------------------------------------------
+
+local function extractBookHash(item)
+  if not item then return nil end
+
+  if item.nbtHash then
+    return item.nbtHash
+  end
+
+  if item.nbt then
+    return item.nbt.hash or item.nbt.id
+  end
+
+  return nil
+end
+
+local function canUseMachine()
+  local now = os.clock()
+
+  -- reset hourly window
+  if now - windowStart >= WINDOW_SECONDS then
+    uses = 0
+    windowStart = now
+  end
+
+  return uses < MAX_USES_PER_HOUR
+end
+
+local function findValidBook()
+  local items = input.list()
+
+  for slot, item in pairs(items) do
+    if item and item.name == "minecraft:written_book" then
+      local detail = input.getItemDetail(slot)
+      local hash = extractBookHash(detail)
+
+      if hash == VALID_BOOK_HASH then
+        return slot, hash
+      end
+    end
+  end
+
+  return nil
+end
+
+local function getLootSlots()
+  local items = loot.list()
+  local slots = {}
+
+  for slot, item in pairs(items) do
+    if item then
+      table.insert(slots, slot)
+    end
+  end
+
+  return slots
+end
+
+--------------------------------------------------
+-- DISPENSE LOGIC
+--------------------------------------------------
+
+local function dispenseRandomItems(count)
+  local slots = getLootSlots()
+  if #slots == 0 then return end
+
+  for i = 1, count do
+    local lootSlot = slots[math.random(1, #slots)]
+
+    local moved = loot.pushItems(
+      dispName,
+      lootSlot,
+      1
+    )
+
+    if moved > 0 then
+      disp.trigger()
+      sleep(0.15)
+    end
+  end
+end
+
+local function consumeBook(slot)
+  input.pushItems(dispName, slot, 1)
+end
+
+--------------------------------------------------
+-- MAIN LOOP
+--------------------------------------------------
+
+print("Mystery Capsule Machine ONLINE (10 uses/hour limit)")
+
+while true do
+
+  local slot, hash = findValidBook()
+
+  if slot then
+
+    -- RATE LIMIT CHECK
+    if not canUseMachine() then
+      print("Cooldown active: 10 uses/hour reached")
+      sleep(2)
+    else
+      print("Valid capsule detected: " .. hash)
+
+      -- consume key
+      consumeBook(slot)
+
+      -- register usage
+      uses = uses + 1
+
+      -- determine reward
+      local rewardCount = TIER_BONUS[hash] or 1
+
+      -- dispense loot
+      dispenseRandomItems(rewardCount)
+
+      print("Used " .. uses .. "/" .. MAX_USES_PER_HOUR)
+    end
+  end
+
+  sleep(1)
+end
