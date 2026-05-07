@@ -14,8 +14,14 @@ local LOOT_NAME    = "minecraft:ironchest_obsidian_206"
 local TRASH_NAME   = "minecraft:ironchest_obsidian_207"
 local MONITOR_NAME = "monitor_970"
 
+--------------------------------------------------
+-- VALID BOOK HASH
+--------------------------------------------------
 local VALID_BOOK_HASH = "01cf97"
 
+--------------------------------------------------
+-- RATE LIMIT
+--------------------------------------------------
 local MAX_USES_PER_HOUR = 10
 local WINDOW_SECONDS = 3600
 
@@ -41,22 +47,24 @@ if not mon then error("Missing monitor") end
 local trashName = peripheral.getName(trash)
 
 --------------------------------------------------
--- DROPPER (LEFT SIDE - FIXED SAFE VERSION)
+-- DROPPER (RIGHT SIDE - FIXED)
 --------------------------------------------------
-local DISP_SIDE = "left"
+local DISP_SIDE = "right"
 
 if not peripheral.isPresent(DISP_SIDE) then
-    error("No peripheral on LEFT side")
+    error("No peripheral found on RIGHT side")
 end
 
 local dropper = peripheral.wrap(DISP_SIDE)
 
 if not dropper then
-    error("Failed to wrap dropper on left side")
+    error("Failed to wrap dropper on RIGHT side")
 end
 
+print("Dropper detected:", peripheral.getType(DISP_SIDE))
+
 --------------------------------------------------
--- MONITOR
+-- MONITOR UI
 --------------------------------------------------
 local function drawMonitor()
 
@@ -89,6 +97,7 @@ end
 -- RATE LIMIT
 --------------------------------------------------
 local function canUse()
+
     local now = os.clock()
 
     if now - windowStart >= WINDOW_SECONDS then
@@ -103,6 +112,7 @@ end
 -- LOOT SYSTEM
 --------------------------------------------------
 local function getLootSlots()
+
     local items = loot.list()
     local slots = {}
 
@@ -116,6 +126,7 @@ local function getLootSlots()
 end
 
 local function dispense(count)
+
     local slots = getLootSlots()
 
     if #slots == 0 then
@@ -124,6 +135,7 @@ local function dispense(count)
     end
 
     for i = 1, count do
+
         local slot = slots[math.random(1, #slots)]
 
         local moved = loot.pushItems(DISP_SIDE, slot, 1)
@@ -167,7 +179,7 @@ end
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-print("Capsule Machine ONLINE (FIXED DROPPER)")
+print("Mystery Capsule Machine ONLINE (RIGHT DROPPER FIXED)")
 
 while true do
 
