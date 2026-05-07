@@ -16,7 +16,7 @@ local DISP_NAME    = "minecraft:dispenser_0" -- CHANGE IF NEEDED
 local MONITOR_NAME = "monitor_970"
 
 --------------------------------------------------
--- VALID CAPSULE BOOK
+-- VALID CAPSULE HASH
 --------------------------------------------------
 local VALID_BOOK_HASH = "01cf97"
 
@@ -63,9 +63,11 @@ local dispName = peripheral.getName(disp)
 -- MONITOR UI
 --------------------------------------------------
 local function drawMonitor()
-    mon.setTextScale(0.5)
+
     mon.setBackgroundColor(colors.black)
     mon.setTextColor(colors.white)
+    mon.setTextScale(0.5)
+
     mon.clear()
 
     local remaining = MAX_USES_PER_HOUR - uses
@@ -74,7 +76,7 @@ local function drawMonitor()
     local cooldown = math.max(0, WINDOW_SECONDS - elapsed)
 
     mon.setCursorPos(2,2)
-    mon.write("MYSTERY CAPSULE")
+    mon.write("MYSTERY CAPSULE MACHINE")
 
     mon.setCursorPos(2,4)
     mon.write("Uses: "..uses.."/"..MAX_USES_PER_HOUR)
@@ -93,28 +95,10 @@ local function drawMonitor()
 end
 
 --------------------------------------------------
--- BOOK HASH
---------------------------------------------------
-local function getBookHash(detail)
-    if not detail then
-        return nil
-    end
-
-    if detail.nbtHash then
-        return detail.nbtHash
-    end
-
-    if detail.nbt then
-        return detail.nbt.hash or detail.nbt.id
-    end
-
-    return nil
-end
-
---------------------------------------------------
 -- RATE LIMIT CHECK
 --------------------------------------------------
 local function canUse()
+
     local now = os.clock()
 
     if now - windowStart >= WINDOW_SECONDS then
@@ -129,6 +113,7 @@ end
 -- RANDOM LOOT SLOTS
 --------------------------------------------------
 local function getLootSlots()
+
     local items = loot.list()
     local slots = {}
 
@@ -142,9 +127,10 @@ local function getLootSlots()
 end
 
 --------------------------------------------------
--- DISPENSE ITEMS
+-- DISPENSE RANDOM ITEMS
 --------------------------------------------------
 local function dispenseLoot(count)
+
     local slots = getLootSlots()
 
     if #slots == 0 then
@@ -183,10 +169,9 @@ local function processInput()
             --------------------------------------------------
             -- VALID BOOK CHECK
             --------------------------------------------------
-            if item.name == "minecraft:written_book" then
+            if item.name == "minecraft:written_book" and item.nbtHash then
 
-                local detail = input.getItemDetail(slot)
-                local hash = getBookHash(detail)
+                local hash = string.sub(item.nbtHash, 1, 6)
 
                 if hash == VALID_BOOK_HASH then
                     return slot, true
@@ -244,5 +229,5 @@ while true do
 
     drawMonitor()
 
-    sleep(1)
+    sleep(0.25)
 end
