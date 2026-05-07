@@ -31,7 +31,7 @@ local windowStart = os.clock()
 local lastStatus = "Idle"
 
 --------------------------------------------------
--- PERIPHERALS (STATIC)
+-- PERIPHERALS
 --------------------------------------------------
 local input = peripheral.wrap(INPUT_NAME)
 local hopper = peripheral.wrap(HOPPER_NAME)
@@ -48,27 +48,19 @@ if not mon then error("Missing monitor") end
 local trashName = peripheral.getName(trash)
 
 --------------------------------------------------
--- AUTO-DETECT DROPPER
+-- DROPPER (LEFT SIDE FIX)
 --------------------------------------------------
-local function findDropper()
-    local names = peripheral.getNames()
+local DISP_SIDE = "left"
 
-    for _, name in ipairs(names) do
-        if peripheral.getType(name) == "dropper" then
-            return name
-        end
-    end
-
-    return nil
+if not peripheral.isPresent(DISP_SIDE) then
+    error("No peripheral found on LEFT side")
 end
 
-local DISP_NAME = findDropper()
-
-if not DISP_NAME then
-    error("No dropper found attached to computer")
+if peripheral.getType(DISP_SIDE) ~= "dropper" then
+    error("Peripheral on LEFT is not a dropper (found: "..tostring(peripheral.getType(DISP_SIDE))..")")
 end
 
-local dropper = peripheral.wrap(DISP_NAME)
+local dropper = peripheral.wrap(DISP_SIDE)
 
 --------------------------------------------------
 -- MONITOR
@@ -132,6 +124,7 @@ end
 
 local function dispense(count)
     local slots = getLootSlots()
+
     if #slots == 0 then
         lastStatus = "Loot empty"
         return
@@ -140,7 +133,7 @@ local function dispense(count)
     for i = 1, count do
         local slot = slots[math.random(1, #slots)]
 
-        local moved = loot.pushItems(DISP_NAME, slot, 1)
+        local moved = loot.pushItems(DISP_SIDE, slot, 1)
 
         if moved > 0 then
             dropper.trigger()
@@ -150,7 +143,7 @@ local function dispense(count)
 end
 
 --------------------------------------------------
--- INPUT PROCESSING (NBT HASH FIXED)
+-- INPUT PROCESSING (NBT FIXED)
 --------------------------------------------------
 local function processInput()
 
@@ -169,7 +162,6 @@ local function processInput()
                 end
             end
 
-            -- anything else → trash
             input.pushItems(trashName, slot, 64)
             lastStatus = "Invalid item → trashed"
             return nil, false
@@ -182,9 +174,7 @@ end
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-print("Capsule Machine ONLINE (AUTO DROPPER MODE)")
-
-print("Using dropper:", DISP_NAME)
+print("Capsule Machine ONLINE (LEFT DROPPER FIX)")
 
 while true do
 
