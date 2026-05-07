@@ -41,7 +41,7 @@ if not mon then error("Missing monitor") end
 local trashName = peripheral.getName(trash)
 
 --------------------------------------------------
--- REDSTONE INTEGRATOR (ONLY ACTUATOR)
+-- REDSTONE INTEGRATOR
 --------------------------------------------------
 local ri = peripheral.wrap("redstone_integrator_4067")
 if not ri then
@@ -154,18 +154,19 @@ local function getLootSlots()
 end
 
 --------------------------------------------------
--- FIRE SYSTEM (FIXED)
+-- FIRE CAPSULE (FIXED)
 --------------------------------------------------
 local function fireCapsule()
 
-    ri.setOutput(true)
+    -- CORRECT integrator usage (string channel + boolean)
+    ri.setOutput("output", true)
     sleep(0.1)
-    ri.setOutput(false)
+    ri.setOutput("output", false)
 
 end
 
 --------------------------------------------------
--- DISPENSE
+-- DISPENSE ITEMS
 --------------------------------------------------
 local function dispense(count)
 
@@ -220,7 +221,7 @@ end
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-print("Capsule Machine ONLINE (FINAL FIXED MODE)")
+print("Capsule Machine ONLINE (FINAL FIXED)")
 
 while true do
 
