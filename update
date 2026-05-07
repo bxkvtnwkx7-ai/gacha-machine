@@ -1,5 +1,5 @@
 --------------------------------------------------
--- MYSTERY CAPSULE MACHINE
+-- MYSTERY CAPSULE MACHINE (BULLETPROOF EDITION)
 -- CC:Tweaked 1.12.2 / Tekkit 2
 --------------------------------------------------
 
@@ -14,20 +14,14 @@ local LOOT_NAME    = "minecraft:ironchest_obsidian_206"
 local TRASH_NAME   = "minecraft:ironchest_obsidian_207"
 local MONITOR_NAME = "monitor_970"
 
---------------------------------------------------
--- VALID BOOK HASH
---------------------------------------------------
 local VALID_BOOK_HASH = "01cf97"
 
---------------------------------------------------
--- RATE LIMIT
---------------------------------------------------
 local MAX_USES_PER_HOUR = 10
 local WINDOW_SECONDS = 3600
 
 local uses = 0
 local windowStart = os.clock()
-local lastStatus = "Idle"
+local lastStatus = "Booting..."
 
 --------------------------------------------------
 -- PERIPHERALS
@@ -47,24 +41,52 @@ if not mon then error("Missing monitor") end
 local trashName = peripheral.getName(trash)
 
 --------------------------------------------------
--- DROPPER (RIGHT SIDE - FIXED)
+-- AUTO FIND DROPPER (ROBUST)
 --------------------------------------------------
-local DISP_SIDE = "right"
+local dropperName = nil
+local dropper = nil
 
-if not peripheral.isPresent(DISP_SIDE) then
-    error("No peripheral found on RIGHT side")
+local function findDropper()
+    for _, name in ipairs(peripheral.getNames()) do
+        local ptype = peripheral.getType(name)
+
+        if ptype == "dropper" or ptype == "minecraft:dropper" then
+            return name
+        end
+    end
+    return nil
 end
 
-local dropper = peripheral.wrap(DISP_SIDE)
+dropperName = findDropper()
 
-if not dropper then
-    error("Failed to wrap dropper on RIGHT side")
+if not dropperName then
+    error("No dropper found anywhere on network")
 end
 
-print("Dropper detected:", peripheral.getType(DISP_SIDE))
+dropper = peripheral.wrap(dropperName)
 
 --------------------------------------------------
--- MONITOR UI
+-- SAFE DROP TEST
+--------------------------------------------------
+local function testDropper()
+    if not dropper then return false end
+
+    local test = dropper.list()
+    if test == nil then
+        return false
+    end
+
+    return true
+end
+
+if not testDropper() then
+    error("Dropper found but not usable: " .. tostring(dropperName))
+end
+
+print("Dropper online:", dropperName)
+
+--------------------------------------------------
+-- MONITOR
 --------------------------------------------------
 local function drawMonitor()
 
@@ -78,19 +100,19 @@ local function drawMonitor()
     mon.write("MYSTERY CAPSULE MACHINE")
 
     mon.setCursorPos(2,4)
-    mon.write("Uses: "..uses.."/"..MAX_USES_PER_HOUR)
+    mon.write("Dropper: OK")
 
     mon.setCursorPos(2,5)
-    mon.write("Remaining: "..remaining)
+    mon.write("Uses: "..uses.."/"..MAX_USES_PER_HOUR)
 
     mon.setCursorPos(2,6)
+    mon.write("Remaining: "..remaining)
+
+    mon.setCursorPos(2,7)
     mon.write("Cooldown: "..math.floor(cooldown).."s")
 
-    mon.setCursorPos(2,8)
-    mon.write("Status:")
-
     mon.setCursorPos(2,9)
-    mon.write(lastStatus)
+    mon.write("Status: "..lastStatus)
 end
 
 --------------------------------------------------
@@ -138,7 +160,7 @@ local function dispense(count)
 
         local slot = slots[math.random(1, #slots)]
 
-        local moved = loot.pushItems(DISP_SIDE, slot, 1)
+        local moved = loot.pushItems(dropperName, slot, 1)
 
         if moved > 0 then
             dropper.trigger()
@@ -179,7 +201,8 @@ end
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-print("Mystery Capsule Machine ONLINE (RIGHT DROPPER FIXED)")
+print("Capsule Machine ONLINE (BULLETPROOF MODE)")
+print("Using dropper:", dropperName)
 
 while true do
 
